@@ -1,0 +1,26 @@
+schema_version = "1.1"
+
+[task]
+name = "humanlaya/coding-exam-001"
+description = "Analyze a Web server access log and write a summary report to /output/report.txt."
+authors = [{ name = "humanlaya", email = "noreply@example.com" }]
+keywords = ["shell", "log-analysis", "text-processing"]
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+gpus = 0
+allow_internet = true
+
+[verifier]
+timeout_sec = 120.0
+
+[metadata]
+difficulty = "easy"
+category = "data-processing"
+tags = ["shell", "log-analysis", "text-processing"]
