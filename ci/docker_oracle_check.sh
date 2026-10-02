@@ -37,7 +37,7 @@ docker run --rm \
     "$IMAGE" bash -c '
 set -e
 cp -r /src/solution /solution && chmod +x /solution/solve.sh
-/src/solution/solve.sh
+/solution/solve.sh
 echo "===== /output/report.txt produced by the solution ====="
 cat /output/report.txt
 cp -r /src/tests /tests && chmod +x /tests/test.sh
