@@ -1,0 +1,7 @@
+task                          = exam_003
+docker image                  = built from exam_003/environment/Dockerfile
+solve.sh produced the fix     = yes (content-verified: '//' gone, '/' present)
+reward_after_solve.sh         = 1
+reward_hardcoded_answer       = 0
+reward_buggy_image            = 0
+expected                      = 1 / 0 / 0

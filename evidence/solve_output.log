@@ -1,0 +1,4 @@
+已修复：total // len(orders)  ->  total / len(orders)
+stats.py 输出：{"total_amount": 558, "average_amount": 111.6}
+自检通过：total_amount=558 average_amount=111.6
+solve.sh 完成

@@ -1,0 +1,4 @@
+程序输出： {"total_amount": 558, "average_amount": 111.6}
+  total_amount: PASS（期望 558，实际 558，相对误差 0.00e+00）
+  average_amount: PASS（期望 111.6，实际 111.6，相对误差 0.00e+00）
+reward = 1
