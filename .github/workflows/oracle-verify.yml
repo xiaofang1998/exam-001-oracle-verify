@@ -190,3 +190,47 @@ jobs:
 
       - name: Run solve.sh in the built image, then the verifier
         run: bash ci/docker_oracle_check_exam003.sh
+
+  # The oracle job runs `harbor trials start`, which executes solution/solve.sh
+  # and tests/test.sh interactively. This job independently re-runs the same
+  # three cases with an explicit exit code, then commits the raw evidence
+  # (reward.json + logs + the image's stats.py) into evidence/ so it can be read
+  # from raw.githubusercontent.com without any token. See evidence/README.md.
+  exam003-evidence:
+    name: exam_003 evidence (raw reward.json)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout submitted task
+        uses: actions/checkout@v4
+
+      - name: Re-run solve.sh + verifier and capture reward.json
+        run: |
+          chmod +x ci/verify_and_record.sh
+          bash ci/verify_and_record.sh exam_003 evidence
+          echo "---- evidence/ ----"
+          find evidence -type f | sort
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exam003-evidence
+          path: evidence
+          if-no-files-found: error
+
+      - name: Commit evidence back to the repository
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name 'xiaofang1998'
+          git config user.email 'xiaofang1998@users.noreply.github.com'
+          git add -f evidence
+          if git diff --cached --quiet; then
+            echo "evidence unchanged; nothing to commit"
+          else
+            git commit -m "evidence(exam_003): docker verifier reward + raw logs [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi

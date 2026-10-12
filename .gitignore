@@ -1,0 +1,5 @@
+# Scratch files produced by ci/verify_and_record.sh. The committed evidence is
+# deliberately limited to reward*.json, stats_*.py, *.log and summary.txt; these
+# entries guard against a stray git add sweeping the scratch inputs in.
+evidence/hardcoded_stats.py
+evidence/logs*/

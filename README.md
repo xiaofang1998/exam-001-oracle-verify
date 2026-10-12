@@ -5,15 +5,17 @@
 
 ```
 .
-├── .github/workflows/oracle-verify.yml       # 4 个 job：两个题目 × (真 Harbor + 纯 Docker)
+├── .github/workflows/oracle-verify.yml       # 5 个 job：两个题目 × (真 Harbor + 纯 Docker) + 证据
 ├── ci/docker_oracle_check.sh                 # exam_001：只用 Docker 复现同一条流水线
 ├── ci/docker_oracle_check_exam003.sh         # exam_003：Docker 复核 + 反例（negative control）
+├── ci/verify_and_record.sh                   # exam_003：跑判分并输出可核验证据（带明确退出码）
+├── evidence/                                 # 由 CI 自动提交的判分原始证据（免认证可读）
 ├── exam_001/                                 # 题目一（提交包本体）
 ├── exam_003/                                 # 题目二（订单统计脚本修复）
 └── README.md
 ```
 
-## 四个 job
+## 五个 job
 
 | job | 题目 | 做什么 |
 |---|---|---|
@@ -21,6 +23,7 @@
 | `docker-only-check` | exam_001 | 只用 Docker 复现 solve.sh + test.sh |
 | `exam003-harbor-oracle` | exam_003 | 真 Harbor oracle trial，读 `/logs/verifier/reward.json` |
 | `exam003-docker-check` | exam_003 | 跑提交的 `solve.sh`，再跑判分；外加两个反例 |
+| `exam003-evidence` | exam_003 | 复跑判分并断言 `1/0/0`，把 `reward.json` 等原始证据提交回 `evidence/` |
 
 ## exam_003（订单统计脚本修复）
 
@@ -45,6 +48,17 @@
 - `exam003-docker-check` 绿色 → `solve.sh` 的行为与判分器的判别力都已确认。
 - 页面底部 Artifacts 可下载 `harbor-oracle-trial-exam003`，里面有
   `verifier/reward.json`、判分明细和 `agent/oracle.txt`（solve.sh 的原始 stdout）。
+
+不想登录 GitHub 也能独立核验（`exam003-evidence` job 会把证据提交回仓库）：
+
+| 免认证链接 | 期望内容 |
+|---|---|
+| [`evidence/summary.txt`](https://raw.githubusercontent.com/xiaofang1998/exam-001-oracle-verify/main/evidence/summary.txt) | `1 / 0 / 0` |
+| [`evidence/reward_after_solve.json`](https://raw.githubusercontent.com/xiaofang1998/exam-001-oracle-verify/main/evidence/reward_after_solve.json) | `{"reward": 1}` |
+| [`evidence/reward_hardcoded.json`](https://raw.githubusercontent.com/xiaofang1998/exam-001-oracle-verify/main/evidence/reward_hardcoded.json) | `{"reward": 0}` |
+| [`evidence/reward_buggy_image.json`](https://raw.githubusercontent.com/xiaofang1998/exam-001-oracle-verify/main/evidence/reward_buggy_image.json) | `{"reward": 0}` |
+
+详见 [`evidence/README.md`](evidence/README.md)。
 
 ## 备注
 
