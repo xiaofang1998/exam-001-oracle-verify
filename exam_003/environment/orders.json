@@ -1,0 +1,9 @@
+{
+  "orders": [
+    {"id": "A001", "item": "机械键盘",   "amount": 128},
+    {"id": "A002", "item": "显示器",     "amount": 256},
+    {"id": "A003", "item": "鼠标",       "amount": 99},
+    {"id": "A004", "item": "USB 集线器", "amount": 45},
+    {"id": "A005", "item": "理线器",     "amount": 30}
+  ]
+}

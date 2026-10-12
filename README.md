@@ -1,58 +1,55 @@
-# exam_001 —— GitHub Actions 云端 oracle 验证
+# GitHub Actions 云端 Harbor oracle 验证
 
-这个目录是**可直接推送的仓库内容**，用来在 GitHub 免费跑测机上执行真实的
-`harbor trials start -p exam_001 -a oracle`，并断言 `reward == 1.0`。
-本机不需要安装 Docker，也不需要管理员权限。
+这个仓库用来在 GitHub 免费跑测机上执行**真实的** `harbor trials start -a oracle`，
+并断言 `reward == 1.0`。本机不需要 Docker、WSL2 或管理员权限。
 
 ```
-ci_push/
-├── .github/workflows/oracle-verify.yml   # 两个 job：真实 Harbor oracle + 纯 Docker 复核
-├── ci/docker_oracle_check.sh             # 只用 Docker 复现同一条流水线
-├── exam_001/                             # 提交包本体（与 exam_001.zip 内容一致）
+.
+├── .github/workflows/oracle-verify.yml       # 4 个 job：两个题目 × (真 Harbor + 纯 Docker)
+├── ci/docker_oracle_check.sh                 # exam_001：只用 Docker 复现同一条流水线
+├── ci/docker_oracle_check_exam003.sh         # exam_003：Docker 复核 + 反例（negative control）
+├── exam_001/                                 # 题目一（提交包本体）
+├── exam_003/                                 # 题目二（订单统计脚本修复）
 └── README.md
 ```
 
-## 步骤 1：创建一个空仓库
+## 四个 job
 
-在 https://github.com/new 新建一个仓库（Public 最省事，Private 也够用，免费额度
-2000 分钟/月，这个 workflow 大约跑 5–8 分钟）。**不要**勾选添加 README/.gitignore。
+| job | 题目 | 做什么 |
+|---|---|---|
+| `harbor-oracle` | exam_001 | 真 Harbor v0.5.0 oracle trial，断言 reward |
+| `docker-only-check` | exam_001 | 只用 Docker 复现 solve.sh + test.sh |
+| `exam003-harbor-oracle` | exam_003 | 真 Harbor oracle trial，读 `/logs/verifier/reward.json` |
+| `exam003-docker-check` | exam_003 | 跑提交的 `solve.sh`，再跑判分；外加两个反例 |
 
-## 步骤 2：把 `ci_push/` 推上去
+## exam_003（订单统计脚本修复）
 
-在本机 PowerShell 里执行（把 `<你的用户名>` 和 `<仓库名>` 换成实际值）：
+任务：`/app/stats.py` 里平均金额用了整除 `total // len(orders)`（558 // 5 = 111），
+应改成真除 `total / len(orders)`（→ 111.6）。`solution/solve.sh` 只改这一行，
+不硬编码结果值，可重复执行。
 
-```powershell
-cd C:\workpath\zhunru\ci_push
-git init -b main
-git add -A
-git commit -m "exam_001: harbor oracle verification"
-git remote add origin https://github.com/<你的用户名>/<仓库名>.git
-git push -u origin main
-```
+`exam003-docker-check` 会依次验证三件事，任何一件不符合预期就失败：
 
-推送时若提示密码，请填 **Personal Access Token**（GitHub 已不接受账号密码）：
-Settings → Developer settings → Personal access tokens → 勾选 `repo` 权限即可。
+1. **正常路径**：在按 `exam_003/environment/Dockerfile` 构建出的镜像里执行提交的
+   `solution/solve.sh`，然后执行 `tests/test.sh` → 必须 `reward = 1`。
+   同时用 `diff` 证明 `solve.sh` 真的改了 `/app/stats.py`（修改后不含 `//`，
+   含 `/`），而不是"碰巧通过"。
+2. **反硬编码**：把直接 `print` 答案的 `stats.py` 交给判分程序 → 必须 `reward = 0`。
+3. **反假绿**：未修复的原始镜像交给判分程序 → 必须 `reward = 0`。
 
-## 步骤 3：看结果
+## 看结果
 
-打开 `https://github.com/<你的用户名>/<仓库名>/actions`，等 `exam_001 oracle
-verification` 跑完：
+打开 `https://github.com/xiaofang1998/exam-001-oracle-verify/actions`：
 
-- **harbor-oracle**（主验证）：日志里应出现 `PASS: oracle reward = 1.0`，
-  以及 `=== Status Code Distribution ===` 的判分输出。
-- **docker-only-check**（独立复核）：只用 Docker 复现同一流水线，输出
-  `PASS: oracle reward is 1.0`。
-- 页面底部 Artifacts 可下载 `harbor-oracle-trial`，里面有
-  `verifier/reward.txt`、`verifier/test-stdout.txt` 等原始证据。
+- `exam003-harbor-oracle` 绿色 → 真 Harbor + 真 Docker 上 `reward = 1.0`。
+- `exam003-docker-check` 绿色 → `solve.sh` 的行为与判分器的判别力都已确认。
+- 页面底部 Artifacts 可下载 `harbor-oracle-trial-exam003`，里面有
+  `verifier/reward.json`、判分明细和 `agent/oracle.txt`（solve.sh 的原始 stdout）。
 
-只要 `harbor-oracle` 这个 job 是绿色的，就说明 reward = 1.0 已在真实 Docker +
-真实 Harbor v0.5.0 上得到确认。
+## 备注
 
-## 常见问题
-
-- **uv 安装慢/失败**：重跑一次即可；workflow 已固定 Harbor `v0.5.0` 标签。
-- **`uv run` 首次同步依赖需要几分钟**（harbor 依赖 litellm/datasets 等），
+- `exam003-harbor-oracle` 默认克隆 Harbor 的 `main`（task.toml 声明
+  `schema_version = "1.1"`），失败时回退到 `v0.5.0` 标签。
+- `uv run` 首次同步依赖需要几分钟（harbor 依赖 litellm/datasets 等），
   `timeout-minutes: 45` 足够。
-- **想手动重跑**：Actions 页面 → 选中 workflow → `Run workflow`。
-- **不想用命令行推送**：也可以在 GitHub 仓库页面用 "uploading an existing file"
-  把 `ci_push/` 里的文件逐个拖上去（注意 `.github/workflows/` 这两层目录结构要保留）。
+- 想手动重跑：Actions 页面 → 选中 workflow → `Run workflow`。

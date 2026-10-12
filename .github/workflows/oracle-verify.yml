@@ -1,9 +1,14 @@
-name: exam_001 oracle verification
+name: Harbor oracle verification
 
-# Runs the real Harbor v0.5.0 oracle trial for the submitted task on a GitHub
-# runner (Docker is preinstalled there), then asserts reward == 1.0.
+# Runs the real Harbor oracle trial for the submitted tasks on a GitHub runner
+# (Docker is preinstalled there) and asserts reward == 1.0.
 #
-# Trigger: push to main/master, or manually from the Actions tab.
+# Triggers: push to main/master, or manually from the Actions tab.
+#
+#   harbor-oracle        -> exam_001, real Harbor oracle trial
+#   docker-only-check    -> exam_001, Docker-only replay (no Harbor/uv)
+#   exam003-harbor-oracle-> exam_003, real Harbor oracle trial
+#   exam003-docker-check -> exam_003, Docker-only replay + negative controls
 
 on:
   push:
@@ -12,7 +17,7 @@ on:
 
 jobs:
   harbor-oracle:
-    name: Harbor v0.5.0 oracle trial
+    name: Harbor v0.5.0 oracle trial (exam_001)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -78,14 +83,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: harbor-oracle-trial
+          name: harbor-oracle-trial-exam001
           path: |
             harbor/trials
             trial.log
           if-no-files-found: warn
 
   docker-only-check:
-    name: Docker-only simulation (no Harbor)
+    name: Docker-only simulation (exam_001)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -94,3 +99,94 @@ jobs:
 
       - name: Build image, run solve.sh, run test.sh
         run: bash ci/docker_oracle_check.sh exam_001
+
+  exam003-harbor-oracle:
+    name: Harbor oracle trial (exam_003)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout submitted task
+        uses: actions/checkout@v4
+
+      - name: Runner info
+        run: |
+          docker version
+          docker compose version || true
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # exam_003 declares schema_version = "1.1"; v0.5.0 is kept as the fallback
+      # in case the current main has drifted.
+      - name: Clone Harbor
+        run: |
+          git clone --depth 1 https://github.com/laude-institute/harbor.git harbor \
+            || git clone --depth 1 --branch v0.5.0 https://github.com/laude-institute/harbor.git harbor \
+            || git clone --depth 1 https://github.com/harbor-framework/harbor.git harbor
+          git -C harbor log --oneline -1 || true
+          git -C harbor describe --tags --always || true
+          uv run --directory harbor harbor --version || true
+
+      - name: Run oracle trial
+        continue-on-error: true
+        working-directory: harbor
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          uv run harbor trials start -p "$GITHUB_WORKSPACE/exam_003" -a oracle 2>&1 \
+            | tee "$GITHUB_WORKSPACE/trial-exam003.log"
+
+      - name: Show trial output
+        if: always()
+        run: |
+          echo "===== trials tree ====="
+          find harbor/trials -maxdepth 5 -type f 2>/dev/null | sort || true
+          echo "===== reward.json ====="
+          find harbor/trials -name 'reward.json' -exec sh -c 'echo "== $1"; cat "$1"' _ {} \; 2>/dev/null || true
+          echo "===== verifier logs ====="
+          find harbor/trials -path '*verifier*' -type f -name '*.txt' -o -path '*verifier*' -name '*.log' 2>/dev/null | while read -r f; do
+            echo "== $f"; cat "$f" || true
+          done
+          echo "===== oracle.txt (solve.sh stdout) ====="
+          cat harbor/trials/*/agent/oracle.txt 2>/dev/null || true
+
+      - name: Assert reward == 1.0
+        if: always()
+        run: |
+          REWARD_FILE="$(find harbor/trials -name 'reward.json' 2>/dev/null | head -n1)"
+          if [ -z "$REWARD_FILE" ]; then
+            echo "FAIL: no /logs/verifier/reward.json was produced by the trial"
+            exit 1
+          fi
+          echo "reward.json: $(cat "$REWARD_FILE")"
+          REWARD="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reward"])' "$REWARD_FILE")"
+          echo "reward=$REWARD (from $REWARD_FILE)"
+          if [ "$(printf '%.1f' "$REWARD")" = "1.0" ]; then
+            echo "PASS: exam_003 oracle reward = 1.0"
+          else
+            echo "FAIL: expected reward 1.0"
+            exit 1
+          fi
+
+      - name: Upload trial artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-oracle-trial-exam003
+          path: |
+            harbor/trials
+            trial-exam003.log
+          if-no-files-found: warn
+
+  exam003-docker-check:
+    name: Docker-only simulation + negative controls (exam_003)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout submitted task
+        uses: actions/checkout@v4
+
+      - name: Run solve.sh in the built image, then the verifier
+        run: bash ci/docker_oracle_check_exam003.sh
